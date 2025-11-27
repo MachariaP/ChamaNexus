@@ -1,8 +1,4 @@
 asgiref==3.11.0
-Django==5.2.8
-djangorestframework==3.16.1
-sqlparse==0.5.3
-asgiref==3.11.0
 decouple==0.0.7
 Django==5.2.8
 django-cors-headers==4.9.0

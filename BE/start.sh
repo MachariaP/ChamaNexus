@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-# Start Gunicorn
+# Start Gunicorn with settings module
 exec gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3
