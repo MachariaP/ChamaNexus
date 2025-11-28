@@ -1,0 +1,43 @@
+databases:
+  - name: chamanexus-db
+    databaseName: chamanexus
+    user: chamanexus
+    plan: free
+
+services:
+  # Backend - Django API
+  - type: web
+    name: chamanexus-backend
+    runtime: python
+    plan: free
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: gunicorn config.wsgi:application
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: chamanexus-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://chamanexus-frontend.onrender.com"
+
+  # Frontend - React/Vite
+  - type: web
+    name: chamanexus-frontend
+    runtime: node
+    plan: free
+    rootDir: FE
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VITE_API_URL
+        value: https://chamanexus-backend.onrender.com
