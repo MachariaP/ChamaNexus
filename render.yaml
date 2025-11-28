@@ -26,7 +26,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.11"
       - key: CORS_ALLOWED_ORIGINS
-        value: "https://chamanexus-frontend.onrender.com"
+        value: "https://chamanexus.onrender.com"
 
   # Frontend - React/Vite
   - type: web
