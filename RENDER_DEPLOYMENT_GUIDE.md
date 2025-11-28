@@ -240,7 +240,9 @@ Ensure your frontend is pointing to the correct backend URL:
 **Cause**: Frontend and backend are on different domains.
 
 **Solution**:
-- Add `django-cors-headers` to requirements
+- `django-cors-headers` is already included in requirements
+- Add `corsheaders` to `INSTALLED_APPS` (already configured)
+- Add `corsheaders.middleware.CorsMiddleware` to `MIDDLEWARE` (already configured)
 - Configure `CORS_ALLOWED_ORIGINS` with the frontend URL
 - Ensure the frontend URL includes the protocol (https://)
 
