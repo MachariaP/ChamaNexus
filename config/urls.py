@@ -14,9 +14,34 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings  # ✅ IMPORTANT: Add this import
+from django.conf.urls.static import static
+from rest_framework.authtoken import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Authentication endpoints
+    path('api/v1/auth/', include('rest_framework.urls')),  # Session auth
+    path('api/v1/auth-token/', views.obtain_auth_token),   # Token auth
+    
+    # Your app URLs (uncomment when you create apps)
+    # path('api/v1/accounts/', include('accounts.urls')),
+    # path('api/v1/chamas/', include('chamas.urls')),
 ]
+
+# Serve static files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# Debug toolbar (optional - for development)
+if settings.DEBUG:
+    try:
+        import debug_toolbar
+        urlpatterns = [
+            path('__debug__/', include(debug_toolbar.urls)),
+        ] + urlpatterns
+    except ImportError:
+        pass
