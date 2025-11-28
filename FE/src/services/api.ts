@@ -2,19 +2,20 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-export const api = axios.create({
+const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true, // Important for session/token cookies
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor for adding auth token
+// Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('auth_token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = `Token ${token}`;
     }
     return config;
   },
@@ -23,11 +24,17 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling token refresh
+// Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    // Handle token refresh logic here
+  (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized access
+      localStorage.removeItem('auth_token');
+      window.location.href = '/login';
+    }
     return Promise.reject(error);
   }
 );
+
+export default api;
