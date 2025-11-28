@@ -23,8 +23,6 @@ wheels/
 
 # Virtual Environment
 venv/
-.venv/
-.env
 env/
 ENV/
 
@@ -38,7 +36,7 @@ db.sqlite3-journal
 /logs
 
 # Environment variables
-.venv
+.env
 
 # IDE
 .vscode/
