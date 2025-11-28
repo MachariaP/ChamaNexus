@@ -1,3 +1,2 @@
-web: gunicorn chamanexus.wsgi:application --bind 0.0.0.0:$PORT
-worker: celery -A chamanexus worker --loglevel=info
-beat: celery -A chamanexus beat --loglevel=info
+web: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+# Remove the worker and beat lines for now unless you've set up Celery
