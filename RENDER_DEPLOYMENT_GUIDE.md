@@ -120,7 +120,7 @@ If you prefer to set up services manually, follow these steps:
 | `SECRET_KEY` | _(auto-generate)_ | Django secret key |
 | `DEBUG` | `False` | Disable debug mode |
 | `ALLOWED_HOSTS` | `.onrender.com` | Allowed hosts |
-| `PYTHON_VERSION` | `3.11.4` | Python version |
+| `PYTHON_VERSION` | `3.11` | Python version |
 | `CORS_ALLOWED_ORIGINS` | `https://chamanexus-frontend.onrender.com` | CORS allowed origins |
 
 ### Frontend (React) Environment Variables
@@ -156,6 +156,8 @@ Build Command: npm install && npm run build
 Start Command: npm start
 Plan: Free
 ```
+
+> **Note**: The `npm start` command runs `serve dist -s -l $PORT` which serves the built static files. This is already configured in `package.json`.
 
 ### Database Settings
 
