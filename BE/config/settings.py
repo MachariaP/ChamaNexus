@@ -13,18 +13,55 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 from datetime import timedelta
-from decouple import config
-
-import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Quick-start development settings
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-hc@_v1a84*kxj$86*5=u@7i!pz7q0sq3jb7#db74+)j4y^+%w)')
-DEBUG = config('DEBUG', default=True, cast=bool)
+# Handle decouple import with fallback for build process
+try:
+    from decouple import config
+    DECOUPLE_AVAILABLE = True
+except ImportError:
+    DECOUPLE_AVAILABLE = False
+    import os
+    # Fallback config function that uses os.environ
+    def config(key, default=None, cast=None):
+        value = os.environ.get(key, default)
+        if cast and value is not None:
+            try:
+                if cast == bool:
+                    # Handle boolean values
+                    if isinstance(value, str):
+                        if value.lower() in ('true', '1', 'yes', 'on'):
+                            return True
+                        elif value.lower() in ('false', '0', 'no', 'off'):
+                            return False
+                    return bool(value)
+                elif cast == int:
+                    return int(value)
+                elif cast == list:
+                    if isinstance(value, str):
+                        return [item.strip() for item in value.split(',')]
+                    return value
+                else:
+                    return cast(value)
+            except (ValueError, TypeError):
+                return default
+        return value
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+# Import dj_database_url with fallback
+try:
+    import dj_database_url
+    DJ_DATABASE_URL_AVAILABLE = True
+except ImportError:
+    DJ_DATABASE_URL_AVAILABLE = False
+
+# Quick-start development settings - unsuitable for production
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-fallback-key-change-in-production')
+
+DEBUG = config('DEBUG', default=False, cast=bool)
+
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.onrender.com', cast=list)
 
 # Application definition
 INSTALLED_APPS = [
@@ -37,11 +74,11 @@ INSTALLED_APPS = [
     
     # Third-party apps
     'rest_framework',
-    'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
     
     # Your apps (add these as you create them)
+    # 'accounts', 'chamas', etc.
 ]
 
 MIDDLEWARE = [
@@ -75,27 +112,36 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database
+# Database configuration with multiple fallbacks
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='chamanexus_db'),
-        'USER': config('DB_USER', default='chamanexus_user'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default=5432, cast=int),
-        'CONN_MAX_AGE': 600,
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
-# For production with DATABASE_URL
-if config('DATABASE_URL', default=None):
-    import dj_database_url
-    DATABASES['default'] = dj_database_url.config(
-        default=config('DATABASE_URL'),
-        conn_max_age=600,
-        ssl_require=not DEBUG
-    )
+# Use PostgreSQL if DATABASE_URL is available
+if DJ_DATABASE_URL_AVAILABLE:
+    DATABASE_URL = config('DATABASE_URL', default=None)
+    if DATABASE_URL:
+        DATABASES['default'] = dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=not DEBUG
+        )
+else:
+    # Fallback to individual DB settings if dj-database-url is not available
+    db_name = config('DB_NAME', default=None)
+    if db_name:
+        DATABASES['default'] = {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': db_name,
+            'USER': config('DB_USER', default=''),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default=5432, cast=int),
+            'CONN_MAX_AGE': 600,
+        }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -115,28 +161,29 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Africa/Nairobi'  # Changed for Kenyan time
+TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-MEDIA_URL = 'media/'
+# Media files
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',  # Change to IsAuthenticated when ready
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -147,7 +194,16 @@ REST_FRAMEWORK = {
     ],
 }
 
-# JWT Configuration
+# Add JWT authentication if simplejwt is available
+try:
+    import rest_framework_simplejwt
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'].insert(
+        0, 'rest_framework_simplejwt.authentication.JWTAuthentication'
+    )
+except ImportError:
+    pass
+
+# JWT Configuration (only if simplejwt is available)
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -159,8 +215,31 @@ SIMPLE_JWT = {
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS', 
-    default='http://localhost:3000,http://localhost:5173'
-).split(',')
+    default='http://localhost:3000,http://localhost:5173',
+    cast=list
+)
 
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=DEBUG, cast=bool)
 CORS_ALLOW_CREDENTIALS = True
+
+# Security settings for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}
