@@ -28,7 +28,7 @@ urlpatterns = [
     path('api/v1/auth-token/', views.obtain_auth_token),   # Token auth
     
     # Your app URLs (uncomment when you create apps)
-    # path('api/v1/accounts/', include('accounts.urls')),
+    path('api/v1/accounts/', include('accounts.urls')),
     # path('api/v1/chamas/', include('chamas.urls')),
 ]
 

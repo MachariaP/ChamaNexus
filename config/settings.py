@@ -55,9 +55,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     
-    # Your custom apps (add these as you create them)
-    # 'authentication',
-    # 'chamas',
+    # Your custom apps
+    'accounts',  # ✅ Added accounts app
+    # 'chamas',  # Uncomment when you create these
     # 'members',
 ]
 
@@ -98,11 +98,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Use DATABASE_URL environment variable for PostgreSQL in production
-# Falls back to SQLite for local development
+# Use DATABASE_URL environment variable for PostgreSQL if available
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL:
+    # PostgreSQL configuration from DATABASE_URL
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
@@ -111,11 +111,40 @@ if DATABASE_URL:
         )
     }
 else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+    # Use individual PostgreSQL settings from environment
+    DB_NAME = os.getenv('DB_NAME')
+    DB_USER = os.getenv('DB_USER') 
+    DB_PASSWORD = os.getenv('DB_PASSWORD')
+    DB_HOST = os.getenv('DB_HOST')
+    DB_PORT = os.getenv('DB_PORT')
+    
+    if DB_NAME and DB_USER and DB_PASSWORD:
+        # PostgreSQL with individual settings
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': DB_NAME,
+                'USER': DB_USER,
+                'PASSWORD': DB_PASSWORD,
+                'HOST': DB_HOST,
+                'PORT': DB_PORT,
+                'CONN_MAX_AGE': 600,
+            }
         }
+    else:
+        # Fallback to SQLite for local development
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+
+# PostgreSQL-specific optimizations
+if DATABASE_URL and 'postgres' in DATABASE_URL:
+    DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
+    DATABASES['default']['OPTIONS'] = {
+        'connect_timeout': 10,
     }
 
 
@@ -128,6 +157,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,  # ✅ Increased minimum length
+        }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -135,6 +167,14 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
+]
+
+# Password hashing (using Argon2 - more secure than default)
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
 ]
 
 
@@ -156,6 +196,10 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Media files (user uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # WhiteNoise configuration for serving static files in production
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
@@ -164,6 +208,20 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Custom User Model
+AUTH_USER_MODEL = 'accounts.User'  # ✅ Custom user model
+
+# Authentication backends
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.EmailBackend',  # ✅ Custom email backend
+    'django.contrib.auth.backends.ModelBackend',  # ✅ Keep default as fallback
+]
+
+# Login/Logout URLs (for Django admin if needed)
+LOGIN_REDIRECT_URL = '/admin/'  # Redirect to admin after login
+LOGOUT_REDIRECT_URL = '/admin/login/'  # Redirect to admin login after logout
+LOGIN_URL = '/admin/login/'  # Login URL for admin
+
 # REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -171,7 +229,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',  # ✅ Allows landing page to read data
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -183,6 +241,14 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',  # ✅ Rate limiting for anonymous users
+        'user': '1000/hour'  # ✅ Rate limiting for authenticated users
+    }
 }
 
 # CORS settings - Comprehensive configuration
@@ -241,8 +307,48 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
 
-# Custom user model (uncomment when you create your custom user model)
-# AUTH_USER_MODEL = 'authentication.CustomUser'
+# Email configuration (for password reset)
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@chamanextus.com')
 
 # API versioning
 API_VERSION = 'v1'
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+        'accounts': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
