@@ -1,20 +1,129 @@
 import api from './api';
 
+export interface User {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  phone_number?: string;
+  is_verified: boolean;
+  profile_picture?: string;
+  created_at: string;
+  last_login?: string;
+}
+
+export interface LoginResponse {
+  message: string;
+  user: User;
+  token: string;
+}
+
+export interface RegisterData {
+  email: string;
+  first_name: string;
+  last_name: string;
+  password: string;
+  password_confirm: string;
+  phone_number?: string;
+}
+
 export const authService = {
-  async login(email: string, password: string) {
-    const response = await api.post('/auth-token/', { email, password });
-    const token = response.data.token;
-    localStorage.setItem('auth_token', token);
+  // Register new user
+  async register(userData: RegisterData): Promise<LoginResponse> {
+    const response = await api.post('/accounts/auth/register/', userData);
+    
+    if (response.data.token) {
+      localStorage.setItem('auth_token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    
     return response.data;
   },
 
-  async logout() {
-    localStorage.removeItem('auth_token');
-    await api.post('/auth/logout/');
+  // Login user
+  async login(email: string, password: string): Promise<LoginResponse> {
+    const response = await api.post('/accounts/auth/login/', { email, password });
+    
+    if (response.data.token) {
+      localStorage.setItem('auth_token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    
+    return response.data;
   },
 
-  async getProfile() {
-    const response = await api.get('/user/profile/');
+  // Logout user
+  async logout(): Promise<void> {
+    try {
+      await api.post('/accounts/auth/logout/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+    }
+  },
+
+  // Get user profile
+  async getProfile(): Promise<User> {
+    const response = await api.get('/accounts/users/profile/');
+    localStorage.setItem('user', JSON.stringify(response.data));
     return response.data;
+  },
+
+  // Change password
+  async changePassword(
+    oldPassword: string, 
+    newPassword: string, 
+    confirmPassword: string
+  ): Promise<{ message: string; token?: string }> {
+    const response = await api.put('/accounts/users/change-password/', {
+      old_password: oldPassword,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    });
+    
+    if (response.data.token) {
+      localStorage.setItem('auth_token', response.data.token);
+    }
+    
+    return response.data;
+  },
+
+  // Request password reset
+  async requestPasswordReset(email: string): Promise<{ message: string }> {
+    const response = await api.post('/accounts/password-reset/', { email });
+    return response.data;
+  },
+
+  // Confirm password reset
+  async confirmPasswordReset(
+    resetToken: string, 
+    newPassword: string, 
+    confirmPassword: string
+  ): Promise<{ message: string }> {
+    const response = await api.post('/accounts/password-reset/confirm/', {
+      reset_token: resetToken,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    });
+    return response.data;
+  },
+
+  // Check if user is authenticated
+  isAuthenticated(): boolean {
+    return !!localStorage.getItem('auth_token');
+  },
+
+  // Get current user
+  getCurrentUser(): User | null {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  },
+
+  // Get auth token
+  getToken(): string | null {
+    return localStorage.getItem('auth_token');
   },
 };
