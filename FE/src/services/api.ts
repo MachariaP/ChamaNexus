@@ -8,8 +8,8 @@ import axios from 'axios';
 // Configuration
 // ============================================================================
 
-// API base URL (can be overridden by environment variable)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+// API base URL - remove any trailing slash
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
 
 // CSRF token management
 let csrfToken: string | null = null;
@@ -23,6 +23,8 @@ let csrfToken: string | null = null;
  */
 const getCsrfTokenFromCookies = (): string | null => {
   const name = 'csrftoken';
+  if (typeof document === 'undefined') return null;
+  
   const cookies = document.cookie.split(';');
   
   for (let i = 0; i < cookies.length; i++) {
@@ -39,6 +41,7 @@ const getCsrfTokenFromCookies = (): string | null => {
  */
 const fetchCsrfToken = async (): Promise<string | null> => {
   try {
+    // Try the primary API v1 CSRF endpoint
     const response = await axios.get(`${API_BASE_URL}/csrf-token/`, {
       withCredentials: true,
     });
@@ -48,9 +51,25 @@ const fetchCsrfToken = async (): Promise<string | null> => {
       return csrfToken;
     }
     return null;
-  } catch (error) {
-    console.error('CSRF token fetch failed:', error);
-    return null;
+  } catch (error: any) {
+    console.warn('CSRF token fetch from API endpoint failed, trying fallback:', error.message);
+    
+    // Fallback to root CSRF endpoint if API v1 endpoint fails
+    try {
+      const baseUrl = API_BASE_URL.replace(/\/api\/v1$/, '');
+      const fallbackResponse = await axios.get(`${baseUrl}/csrf-token/`, {
+        withCredentials: true,
+      });
+      
+      if (fallbackResponse.data && fallbackResponse.data.csrfToken) {
+        csrfToken = fallbackResponse.data.csrfToken;
+        return csrfToken;
+      }
+      return null;
+    } catch (fallbackError: any) {
+      console.error('Fallback CSRF token fetch failed:', fallbackError.message);
+      return null;
+    }
   }
 };
 
@@ -75,8 +94,14 @@ api.interceptors.request.use(
     // Skip CSRF for GET requests and CSRF token endpoint itself
     const isGetRequest = config.method?.toLowerCase() === 'get';
     const isCsrfEndpoint = config.url?.includes('csrf-token');
+    const isExemptEndpoint = [
+      'login',
+      'register',
+      'password-reset',
+      'api-token-auth'
+    ].some(endpoint => config.url?.includes(endpoint));
     
-    if (!isGetRequest && !isCsrfEndpoint) {
+    if (!isGetRequest && !isCsrfEndpoint && !isExemptEndpoint) {
       let token = getCsrfTokenFromCookies();
       
       // If no CSRF token in cookies, fetch one
@@ -109,13 +134,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const originalRequest = error.config;
+    
     // Handle CSRF token errors (403)
-    if (error.response?.status === 403) {
-      console.error('CSRF Error:', error.response.data);
+    if (error.response?.status === 403 && !originalRequest._retry) {
+      console.warn('CSRF Error, refreshing token...');
+      originalRequest._retry = true;
       
       // Try to get new CSRF token
-      fetchCsrfToken().then(() => {
-        console.log('CSRF token refreshed after 403 error');
+      return fetchCsrfToken().then(() => {
+        return api(originalRequest);
+      }).catch(csrfError => {
+        console.error('Failed to refresh CSRF token:', csrfError);
+        return Promise.reject(error);
       });
     }
     
@@ -124,15 +155,17 @@ api.interceptors.response.use(
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
       
-      // Redirect to login page if not already there
-      if (!window.location.pathname.includes('/login')) {
+      // Only redirect if not already on login page
+      if (window.location.pathname !== '/login' && 
+          window.location.pathname !== '/register') {
         window.location.href = '/login';
       }
     }
     
-    // Log error details
+    // Log error details for debugging
     console.error('API Error:', {
       status: error.response?.status,
+      statusText: error.response?.statusText,
       data: error.response?.data,
       url: error.config?.url,
       method: error.config?.method,
@@ -142,14 +175,77 @@ api.interceptors.response.use(
   }
 );
 
-// Export individual HTTP methods
+// ============================================================================
+// Helper Functions for Authentication
+// ============================================================================
+
+/**
+ * Login helper function
+ */
+export const loginUser = async (email: string, password: string) => {
+  try {
+    const response = await api.post('/accounts/auth/login/', { email, password });
+    
+    if (response.data.token) {
+      localStorage.setItem('auth_token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    
+    // Fetch CSRF token after successful login
+    await fetchCsrfToken();
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('Login error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Register helper function
+ */
+export const registerUser = async (userData: any) => {
+  try {
+    const response = await api.post('/accounts/auth/register/', userData);
+    
+    if (response.data.token) {
+      localStorage.setItem('auth_token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('Registration error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Logout helper function
+ */
+export const logoutUser = async () => {
+  try {
+    await api.post('/accounts/auth/logout/');
+  } catch (error: any) {
+    console.warn('Logout error:', error.message);
+  } finally {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  }
+};
+
+// ============================================================================
+// Export HTTP methods
+// ============================================================================
+
 export const apiGet = (url: string, config?: any) => api.get(url, config);
 export const apiPost = (url: string, data?: any, config?: any) => api.post(url, data, config);
 export const apiPut = (url: string, data?: any, config?: any) => api.put(url, data, config);
 export const apiPatch = (url: string, data?: any, config?: any) => api.patch(url, data, config);
 export const apiDelete = (url: string, config?: any) => api.delete(url, config);
 
-// Export the raw instance
-export { api };
+// Export the raw instance and auth helpers
+export { api, loginUser, registerUser, logoutUser };
 
 export default api;
