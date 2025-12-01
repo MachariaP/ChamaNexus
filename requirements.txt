@@ -2,9 +2,9 @@ asgiref==3.11.0
 Django==5.2.8
 djangorestframework==3.16.1
 sqlparse==0.5.4
-# psycopg2-binary is recommended for Render deployments and PaaS platforms
-# For self-hosted production environments, consider using psycopg2 instead
-psycopg-binary==3.2.13
+# psycopg with binary wheels is recommended for Render deployments and PaaS platforms
+# For self-hosted production environments, consider using psycopg without binary extra
+psycopg[binary]==3.2.13
 dj-database-url==2.1.0
 gunicorn==21.2.0
 whitenoise==6.6.0
