@@ -8,8 +8,8 @@ from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login, logout
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import User
 from .serializers import (
@@ -99,18 +99,6 @@ class AuthViewSet(GenericViewSet):
             'error': 'User not authenticated'
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Class-level CSRF exemption for specific actions
-    #def get_extra_actions(self):
-        #"""Override to apply CSRF exemptions"""
-        #extra_actions = super().get_extra_actions()
-        
-        # Mark login and register as CSRF exempt
-        #for action in extra_actions:
-            #if action.url_name in ['login', 'register']:
-                #action.mapping['post'] = csrf_exempt(action.mapping['post'])
-        
-        #return extra_actions
-
 class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     """User profile management"""
     
@@ -171,7 +159,6 @@ class PasswordResetView(APIView):
     
     permission_classes = [permissions.AllowAny]
     
-    @method_decorator(csrf_exempt)
     def post(self, request):
         """Request password reset"""
         serializer = PasswordResetRequestSerializer(data=request.data)
@@ -210,7 +197,6 @@ class PasswordResetConfirmView(APIView):
     
     permission_classes = [permissions.AllowAny]
     
-    @method_decorator(csrf_exempt)
     def post(self, request):
         """Confirm password reset with token"""
         reset_token = request.data.get('reset_token')

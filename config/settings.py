@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,6 +40,15 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(
 RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# Add frontend URL if available
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://chamanexus.onrender.com')
+if FRONTEND_URL and FRONTEND_URL not in ALLOWED_HOSTS:
+    # Extract domain from URL
+    from urllib.parse import urlparse
+    parsed = urlparse(FRONTEND_URL)
+    if parsed.netloc and parsed.netloc not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(parsed.netloc)
 
 # ============================================================================
 # Application Definition
@@ -81,7 +91,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',  # Keep this
     
-    # Custom CSRF exempt middleware (ADD THIS)
+    # Custom CSRF exempt middleware
     'config.middleware.CsrfExemptApiMiddleware',
     
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -255,10 +265,11 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.AllowAny',  # Changed to AllowAny for API access
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
     ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
@@ -272,27 +283,36 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle'
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour'
+        'anon': '1000/hour',
+        'user': '10000/hour'
     }
 }
 
 # ============================================================================
-# CORS Configuration
+# CORS Configuration (Fixed for Frontend)
 # ============================================================================
 
-# CORS settings for development
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOW_CREDENTIALS = True
-else:
-    # In production, specify allowed origins
-    CORS_ALLOWED_ORIGINS = os.getenv(
-        'CORS_ALLOWED_ORIGINS', 
-        'http://localhost:5173,http://127.0.0.1:5173'
-    ).split(',')
+# Get allowed origins from environment
+CORS_ALLOWED_ORIGINS_ENV = os.getenv(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
+).split(',')
+
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in CORS_ALLOWED_ORIGINS_ENV if origin.strip()]
+
+# Add frontend URL if not already present
+if FRONTEND_URL and FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
+
+# Add backend URL for internal calls
+BACKEND_URL = f'https://{RENDER_EXTERNAL_HOSTNAME}' if RENDER_EXTERNAL_HOSTNAME else 'https://chamanexus-backend.onrender.com'
+if BACKEND_URL and BACKEND_URL not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(BACKEND_URL)
 
 # Additional CORS settings
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all in DEBUG mode
+
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -316,40 +336,58 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # ============================================================================
-# CSRF Configuration
+# CSRF Configuration (Fixed for Frontend)
 # ============================================================================
 
-# CSRF trusted origins for forms
-CSRF_TRUSTED_ORIGINS = os.getenv(
-    'CSRF_TRUSTED_ORIGINS', 
-    'http://localhost:5173,http://127.0.0.1:5173'
+# Get CSRF trusted origins from environment
+CSRF_TRUSTED_ORIGINS_ENV = os.getenv(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
 ).split(',')
+
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_TRUSTED_ORIGINS_ENV if origin.strip()]
+
+# Add frontend and backend URLs
+if FRONTEND_URL and FRONTEND_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(FRONTEND_URL)
+
+if BACKEND_URL and BACKEND_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(BACKEND_URL)
 
 # Session settings for authentication
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG  # Secure cookies in production
-SESSION_COOKIE_NAME = 'sessionid'
+SESSION_COOKIE_NAME = 'chamanexus_session'
 
 # CSRF settings
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to access for API calls
 CSRF_COOKIE_SECURE = not DEBUG  # Secure cookies in production
-CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_COOKIE_NAME = 'chamanexus_csrf'
 CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF
 
 # API endpoints that should be CSRF exempt (for token auth)
 API_CSRF_EXEMPT_PATTERNS = [
-    # Primary routes (with /api/v1 prefix)
-    r'^/api/v1/accounts/auth/login/$',
-    r'^/api/v1/accounts/auth/register/$',
-    r'^/api/v1/accounts/auth/logout/$',
-    r'^/api/v1/accounts/password-reset/.*$',
-    # Fallback routes (without /api/v1 prefix)
-    r'^/accounts/auth/login/$',
+    # Root-level routes (frontend expects these)
     r'^/accounts/auth/register/$',
+    r'^/accounts/auth/login/$',
     r'^/accounts/auth/logout/$',
     r'^/accounts/password-reset/.*$',
+    
+    # API v1 routes
+    r'^/api/v1/accounts/auth/register/$',
+    r'^/api/v1/accounts/auth/login/$',
+    r'^/api/v1/accounts/auth/logout/$',
+    r'^/api/v1/accounts/password-reset/.*$',
+    
+    # CSRF token endpoints
+    r'^/csrf-token/$',
+    r'^/api/v1/csrf-token/$',
+    
+    # Health check endpoints
+    r'^/health/$',
+    r'^/api/v1/health/$',
 ]
 
 # ============================================================================
@@ -396,6 +434,10 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
+        'api': {
+            'format': '{asctime} - {name} - {levelname} - {message}',
+            'style': '{',
+        },
     },
     'handlers': {
         'console': {
@@ -406,6 +448,11 @@ LOGGING = {
             'class': 'logging.FileHandler',
             'filename': BASE_DIR / 'logs/django.log',
             'formatter': 'verbose',
+        },
+        'api_file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs/api.log',
+            'formatter': 'api',
         },
     },
     'root': {
@@ -419,12 +466,12 @@ LOGGING = {
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'DEBUG',
             'propagate': False,
         },
         'accounts': {
-            'handlers': ['console'],
+            'handlers': ['console', 'api_file'],
             'level': 'DEBUG',
             'propagate': False,
         },
