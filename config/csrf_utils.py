@@ -5,6 +5,7 @@ This module provides utility functions for handling CSRF tokens in API requests.
 It helps bridge the gap between Django's CSRF protection and frontend API calls.
 """
 
+from functools import wraps
 from django.middleware.csrf import get_token, rotate_token
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
@@ -202,32 +203,19 @@ class CsrfExemptMiddleware:
         return None
 
 # ============================================================================
-# CSRF Decorators for Views
+# Simple decorator without wraps issue
 # ============================================================================
 
 def csrf_exempt_for_api(view_func):
     """
-    Decorator to exempt API views from CSRF protection.
-    
-    Use this decorator for API endpoints that use token authentication
-    instead of session/cookie authentication.
+    Simple decorator to exempt API views from CSRF protection.
+    This version doesn't cause issues with DRF routers.
     """
-    @method_decorator(csrf_exempt)
-    def wrapped_view(request, *args, **kwargs):
-        # Still set CSRF cookie for consistency
-        ensure_csrf_cookie_set(request)
-        return view_func(request, *args, **kwargs)
-    
-    return wrapped_view
+    view_func.csrf_exempt = True
+    return view_func
 
 def ensure_csrf_for_api(view_func):
     """
-    Decorator to ensure CSRF protection for API views.
-    
-    Use this decorator for API endpoints that should have CSRF protection.
+    Simple decorator to ensure CSRF cookie is set.
     """
-    @method_decorator(ensure_csrf_cookie)
-    def wrapped_view(request, *args, **kwargs):
-        return view_func(request, *args, **kwargs)
-    
-    return wrapped_view
+    return ensure_csrf_cookie(view_func)

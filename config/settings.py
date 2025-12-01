@@ -79,7 +79,11 @@ MIDDLEWARE = [
     # Session and authentication middleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',  # Keep this
+    
+    # Custom CSRF exempt middleware (ADD THIS)
+    'config.middleware.CsrfExemptApiMiddleware',
+    
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
