@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,14 +8,15 @@ from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login, logout
 from django.utils import timezone
-from django.core.exceptions import ValidationError
-from .models import User, UserProfile
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.utils.decorators import method_decorator
+
+from .models import User
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, UserSerializer,
     UserProfileSerializer, ChangePasswordSerializer,
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 )
-from .emails import send_welcome_email
 import uuid
 
 class AuthViewSet(GenericViewSet):
@@ -33,9 +35,13 @@ class AuthViewSet(GenericViewSet):
             # Create auth token
             token, created = Token.objects.get_or_create(user=user)
 
-            # Send welcome email
+            # Send welcome email (in production)
             if not settings.DEBUG:
-                send_welcome_message(user.email, user.first_name)
+                try:
+                    from .emails import send_welcome_email
+                    send_welcome_email(user.email, user.first_name)
+                except ImportError:
+                    pass
             
             # Prepare response data
             user_data = UserSerializer(user, context={'request': request}).data
@@ -59,7 +65,7 @@ class AuthViewSet(GenericViewSet):
             # Create or get auth token
             token, created = Token.objects.get_or_create(user=user)
             
-            # Optional: Login for session auth (if using sessions)
+            # Login for session auth (helps with CSRF)
             login(request, user)
             
             user_data = UserSerializer(user, context={'request': request}).data
@@ -92,6 +98,18 @@ class AuthViewSet(GenericViewSet):
         return Response({
             'error': 'User not authenticated'
         }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Class-level CSRF exemption for specific actions
+    #def get_extra_actions(self):
+        #"""Override to apply CSRF exemptions"""
+        #extra_actions = super().get_extra_actions()
+        
+        # Mark login and register as CSRF exempt
+        #for action in extra_actions:
+            #if action.url_name in ['login', 'register']:
+                #action.mapping['post'] = csrf_exempt(action.mapping['post'])
+        
+        #return extra_actions
 
 class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     """User profile management"""
@@ -137,7 +155,7 @@ class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
             user.last_password_change = timezone.now()
             user.save()
             
-            # Update token (optional: force re-login)
+            # Update token (force re-login)
             Token.objects.filter(user=user).delete()
             new_token = Token.objects.create(user=user)
             
@@ -153,6 +171,7 @@ class PasswordResetView(APIView):
     
     permission_classes = [permissions.AllowAny]
     
+    @method_decorator(csrf_exempt)
     def post(self, request):
         """Request password reset"""
         serializer = PasswordResetRequestSerializer(data=request.data)
@@ -163,7 +182,7 @@ class PasswordResetView(APIView):
             try:
                 user = User.objects.get(email=email, is_active=True)
                 
-                # Generate reset token (in production, send email)
+                # Generate reset token
                 reset_token = str(uuid.uuid4())
                 user.verification_token = reset_token
                 user.verification_sent_at = timezone.now()
@@ -191,6 +210,7 @@ class PasswordResetConfirmView(APIView):
     
     permission_classes = [permissions.AllowAny]
     
+    @method_decorator(csrf_exempt)
     def post(self, request):
         """Confirm password reset with token"""
         reset_token = request.data.get('reset_token')
@@ -220,7 +240,6 @@ class PasswordResetConfirmView(APIView):
                 user.last_password_change = timezone.now()
                 user.verification_token = None
                 user.verification_sent_at = None
-                user.reset_failed_logins()  # Reset any login locks
                 user.save()
                 
                 # Delete existing tokens
@@ -246,5 +265,7 @@ class HealthCheckView(APIView):
         return Response({
             'status': 'healthy',
             'service': 'ChamaNexus API',
-            'timestamp': timezone.now().isoformat()
+            'timestamp': timezone.now().isoformat(),
+            'debug': settings.DEBUG,
+            'api_version': 'v1'
         })
