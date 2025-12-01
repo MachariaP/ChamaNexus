@@ -336,10 +336,16 @@ CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF
 
 # API endpoints that should be CSRF exempt (for token auth)
 API_CSRF_EXEMPT_PATTERNS = [
+    # Primary routes (with /api/v1 prefix)
     r'^/api/v1/accounts/auth/login/$',
     r'^/api/v1/accounts/auth/register/$',
     r'^/api/v1/accounts/auth/logout/$',
     r'^/api/v1/accounts/password-reset/.*$',
+    # Fallback routes (without /api/v1 prefix)
+    r'^/accounts/auth/login/$',
+    r'^/accounts/auth/register/$',
+    r'^/accounts/auth/logout/$',
+    r'^/accounts/password-reset/.*$',
 ]
 
 # ============================================================================

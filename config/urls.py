@@ -46,8 +46,13 @@ urlpatterns = [
     # Admin site
     path('admin/', admin.site.urls),
     
-    # API v1 endpoints
+    # API v1 endpoints (primary)
     path('api/v1/', include(api_patterns)),
+    
+    # Fallback routes for requests without /api/v1 prefix
+    # This handles cases where frontend env variable isn't properly configured
+    path('csrf-token/', csrf_token_view, name='csrf_token_fallback'),
+    path('accounts/', include('accounts.urls')),
     
     # API documentation (optional - for Swagger/Redoc)
     # path('api/docs/', include_docs_urls(title='ChamaNexus API')),
