@@ -14,6 +14,7 @@ from .serializers import (
     UserProfileSerializer, ChangePasswordSerializer,
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 )
+from .emails import send_welcome_email
 import uuid
 
 class AuthViewSet(GenericViewSet):
@@ -31,6 +32,10 @@ class AuthViewSet(GenericViewSet):
             
             # Create auth token
             token, created = Token.objects.get_or_create(user=user)
+
+            # Send welcome email
+            if not settings.DEBUG:
+                send_welcome_message(user.email, user.first_name)
             
             # Prepare response data
             user_data = UserSerializer(user, context={'request': request}).data
