@@ -44,9 +44,23 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
-          manualChunks: {
-            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-            'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+          // Fixed: manualChunks must be a function, not an object
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+                return 'react-vendor'
+              }
+              if (id.includes('@headlessui') || id.includes('@heroicons') || id.includes('lucide-react')) {
+                return 'ui-vendor'
+              }
+              if (id.includes('framer-motion')) {
+                return 'animation-vendor'
+              }
+              if (id.includes('axios')) {
+                return 'http-vendor'
+              }
+              return 'vendor'
+            }
           },
         },
       },
