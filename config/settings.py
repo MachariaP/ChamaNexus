@@ -465,6 +465,29 @@ LOGGING = {
 }
 
 # ============================================================================
+# Gunicorn Configuration
+# ============================================================================
+
+# Timeout for Gunicorn workers (in seconds)
+GUNICORN_TIMEOUT = 120
+
+# Maximum requests a worker will process before restarting
+GUNICORN_MAX_REQUESTS = 1000
+
+# Maximum jitter to add to max_requests
+GUNICORN_MAX_REQUESTS_JITTER = 50
+
+# Worker class
+GUNICORN_WORKER_CLASS = 'sync'
+
+# Number of workers
+GUNICORN_WORKERS = 2
+
+# Keep-alive
+GUNICORN_KEEPALIVE = 5
+
+
+# ============================================================================
 # Custom Settings
 # ============================================================================
 
