@@ -134,8 +134,6 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database Configuration - SIMPLIFIED FOR RENDER
 # ============================================================================
 
-import dj_database_url
-
 # Default to SQLite for development
 DATABASES = {
     'default': {
@@ -147,21 +145,29 @@ DATABASES = {
 # Use Render's PostgreSQL database if DATABASE_URL is available
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    # Force PostgreSQL configuration for Render
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=True
-        )
-    }
-    # Force PostgreSQL engine (important!)
-    DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
+    # Parse the database URL
+    db_config = dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=600,
+        conn_health_checks=True,
+        ssl_require=True
+    )
+    
+    # Ensure PostgreSQL engine
+    db_config['ENGINE'] = 'django.db.backends.postgresql'
+    
+    # Ensure SSL is required for Render
+    if 'OPTIONS' not in db_config:
+        db_config['OPTIONS'] = {}
+    db_config['OPTIONS']['sslmode'] = 'require'
+    
+    # Apply the configuration
+    DATABASES['default'] = db_config
     
     print("✅ Using PostgreSQL database from Render")
-    print(f"📊 Database: {DATABASES['default'].get('NAME')}")
-    print(f"🌐 Host: {DATABASES['default'].get('HOST')}")
+    print(f"📊 Database: {db_config.get('NAME')}")
+    print(f"🌐 Host: {db_config.get('HOST')}")
+    print(f"🔐 SSL Mode: {db_config.get('OPTIONS', {}).get('sslmode', 'not set')}")
 else:
     print("⚠️ Using SQLite database (no DATABASE_URL found)")
 
