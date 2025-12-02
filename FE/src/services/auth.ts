@@ -124,4 +124,14 @@ export const authService = {
   getToken(): string | null {
     return localStorage.getItem('auth_token');
   },
+
+async getDashboardSummary(): Promise<any> {
+  const response = await api.get('/accounts/dashboard/summary/');
+  return response.data;
+},
+
+async getTreasurerDashboard(): Promise<any> {
+  const response = await api.get('/accounts/dashboard/treasurer/');
+  return response.data;
+},
 };
