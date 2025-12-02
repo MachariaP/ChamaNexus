@@ -92,11 +92,13 @@ class AuthViewSet(GenericViewSet):
             logout(request)
             
             return Response({
-                'message': 'Logout successful'
+                'message': 'Logout successful',
+                'redirect_url': settings.FRONTEND_URL
             }, status=status.HTTP_200_OK)
         
         return Response({
-            'error': 'User not authenticated'
+            'error': 'User not authenticated',
+            'redirect_url': settings.FRONTEND_URL
         }, status=status.HTTP_400_BAD_REQUEST)
 
 class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
