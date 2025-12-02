@@ -246,6 +246,7 @@ export const apiPatch = (url: string, data?: any, config?: any) => api.patch(url
 export const apiDelete = (url: string, config?: any) => api.delete(url, config);
 
 // Export the raw instance and auth helpers
-export { api, loginUser, registerUser, logoutUser };
+// Note: Removed duplicate export statement that was causing build error
+// export { api, loginUser, registerUser, logoutUser }; // ← REMOVE THIS LINE
 
 export default api;
