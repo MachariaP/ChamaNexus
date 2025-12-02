@@ -131,7 +131,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # ============================================================================
-# Database Configuration
+# Database Configuration - SIMPLIFIED FOR RENDER
 # ============================================================================
 
 import dj_database_url
@@ -144,24 +144,26 @@ DATABASES = {
     }
 }
 
-# Override with PostgreSQL if DATABASE_URL exists
+# Use Render's PostgreSQL database if DATABASE_URL is available
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    # Parse the DATABASE_URL
-    db_config = dj_database_url.parse(DATABASE_URL)
+    # Force PostgreSQL configuration for Render
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=True
+        )
+    }
+    # Force PostgreSQL engine (important!)
+    DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
     
-    # Ensure it's using PostgreSQL
-    if db_config.get('ENGINE') == 'django.db.backends.postgresql_psycopg2' or \
-       db_config.get('ENGINE') == 'django.db.backends.postgresql':
-        DATABASES = {
-            'default': db_config
-        }
-    else:
-        print(f"Warning: DATABASE_URL engine is {db_config.get('ENGINE')}, expected PostgreSQL")
-
-# Test database connection
-print(f"Database engine: {DATABASES['default'].get('ENGINE')}")
-print(f"Database name: {DATABASES['default'].get('NAME')}")
+    print("✅ Using PostgreSQL database from Render")
+    print(f"📊 Database: {DATABASES['default'].get('NAME')}")
+    print(f"🌐 Host: {DATABASES['default'].get('HOST')}")
+else:
+    print("⚠️ Using SQLite database (no DATABASE_URL found)")
 
 # ============================================================================
 # Password Validation
