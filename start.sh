@@ -1,41 +1,38 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 echo "🚀 Starting ChamaNexus Backend..."
-
-# Wait a moment for database
-sleep 2
 
 # Run database migrations
 echo "📦 Running database migrations..."
 python manage.py migrate --noinput
 
-# Create superuser if not exists (optional, remove in production)
+# Try to create superuser, but continue if it fails
 echo "👤 Checking superuser..."
-python manage.py shell << EOF
-from accounts.models import User
-if not User.objects.filter(is_superuser=True).exists():
-    User.objects.create_superuser(
-        email='admin@chamanexus.com',
-        password='admin123',
-        first_name='Admin',
-        last_name='User'
-    )
-    print("✅ Superuser created: admin@chamanexus.com / admin123")
+if [ -z "$DJANGO_SUPERUSER_EMAIL" ] || [ -z "$DJANGO_SUPERUSER_PASSWORD" ]; then
+    echo "⚠️ Skipping superuser creation (no credentials provided)"
+else
+    # Use the shell to create superuser without triggering Argon2
+    python manage.py shell << EOF
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(email='$DJANGO_SUPERUSER_EMAIL').exists():
+    User.objects.create_superuser('$DJANGO_SUPERUSER_EMAIL', '$DJANGO_SUPERUSER_PASSWORD')
+    print("✅ Superuser created")
 else:
     print("✅ Superuser already exists")
 EOF
+fi
 
-# Collect static files (if not done in build)
+# Collect static files
 echo "📁 Collecting static files..."
-python manage.py collectstatic --noinput || true
+python manage.py collectstatic --noinput --clear
 
-# Start Gunicorn with timeout settings
+# Start Gunicorn
 echo "🌐 Starting Gunicorn..."
 exec gunicorn config.wsgi:application \
     --bind 0.0.0.0:10000 \
     --workers 2 \
     --worker-class sync \
     --timeout 120 \
-    --keep-alive 5 \
-    --access-logfile - \
-    --error-logfile -
+    --max-requests 1000 \
+    --max-requests-jitter 50 \
+    --access-logfile -
