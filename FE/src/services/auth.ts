@@ -1,17 +1,5 @@
 import api from './api';
-
-export interface User {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  full_name: string;
-  phone_number?: string;
-  is_verified: boolean;
-  profile_picture?: string;
-  created_at: string;
-  last_login?: string;
-}
+import type { User } from '../types';
 
 export interface LoginResponse {
   message: string;

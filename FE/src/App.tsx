@@ -10,6 +10,10 @@ const RegisterForm = lazy(() => import('./components/auth/RegisterForm'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const ProtectedRoute = lazy(() => import('./components/ProtectedRoute'));
 
+// Lazy load dashboard pages (you can add more as needed)
+const DashboardProfile = lazy(() => import('./components/dashboard/Profile'));
+const DashboardSettings = lazy(() => import('./components/dashboard/Settings'));
+
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
     <div className="relative">
@@ -37,6 +41,8 @@ const AppContent: React.FC = () => {
         />
         <Route path="/login" element={<LoginForm />} />
         <Route path="/register" element={<RegisterForm />} />
+        
+        {/* Dashboard Routes */}
         <Route
           path="/dashboard"
           element={
@@ -45,6 +51,27 @@ const AppContent: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/profile"
+          element={
+            <ProtectedRoute>
+              <DashboardProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/settings"
+          element={
+            <ProtectedRoute>
+              <DashboardSettings />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Add more dashboard routes here as needed */}
+        
+        {/* Fallback route */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Suspense>
   );
