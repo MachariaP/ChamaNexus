@@ -17,9 +17,9 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:8000',
           changeOrigin: true,
           secure: false,
-          rewrite: (path) => path,
+          rewrite: (path) => path.replace(/^\/api/, ''),
         },
-        // Proxy direct requests (without /api prefix) for backward compatibility
+        // Proxy direct requests (without /api prefix)
         '/accounts': {
           target: env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:8000',
           changeOrigin: true,
@@ -44,7 +44,6 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
-          // Fixed: manualChunks must be a function, not an object
           manualChunks(id) {
             if (id.includes('node_modules')) {
               if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {

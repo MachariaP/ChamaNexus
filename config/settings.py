@@ -134,50 +134,34 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database Configuration
 # ============================================================================
 
-# Use DATABASE_URL environment variable for PostgreSQL if available
-DATABASE_URL = os.getenv('DATABASE_URL')
+import dj_database_url
 
-if DATABASE_URL:
-    # PostgreSQL configuration from DATABASE_URL
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
+# Default to SQLite for development
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
-else:
-    # Use individual PostgreSQL settings from environment
-    DB_NAME = os.getenv('DB_NAME')
-    DB_USER = os.getenv('DB_USER')
-    DB_PASSWORD = os.getenv('DB_PASSWORD')
-    DB_HOST = os.getenv('DB_HOST')
-    DB_PORT = os.getenv('DB_PORT')
+}
+
+# Override with PostgreSQL if DATABASE_URL exists
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    # Parse the DATABASE_URL
+    db_config = dj_database_url.parse(DATABASE_URL)
     
-    if DB_NAME and DB_USER and DB_PASSWORD:
-        # PostgreSQL with individual settings
+    # Ensure it's using PostgreSQL
+    if db_config.get('ENGINE') == 'django.db.backends.postgresql_psycopg2' or \
+       db_config.get('ENGINE') == 'django.db.backends.postgresql':
         DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': DB_NAME,
-                'USER': DB_USER,
-                'PASSWORD': DB_PASSWORD,
-                'HOST': DB_HOST,
-                'PORT': DB_PORT,
-                'CONN_MAX_AGE': 600,
-                'OPTIONS': {
-                    'connect_timeout': 10,
-                }
-            }
+            'default': db_config
         }
     else:
-        # Fallback to SQLite for local development
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
-        }
+        print(f"Warning: DATABASE_URL engine is {db_config.get('ENGINE')}, expected PostgreSQL")
+
+# Test database connection
+print(f"Database engine: {DATABASES['default'].get('ENGINE')}")
+print(f"Database name: {DATABASES['default'].get('NAME')}")
 
 # ============================================================================
 # Password Validation

@@ -9,7 +9,7 @@ import axios from 'axios';
 // ============================================================================
 
 // API base URL - remove any trailing slash
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
 // CSRF token management
 let csrfToken: string | null = null;
@@ -41,7 +41,7 @@ const getCsrfTokenFromCookies = (): string | null => {
  */
 const fetchCsrfToken = async (): Promise<string | null> => {
   try {
-    // Try the primary API v1 CSRF endpoint
+    // FIXED: No leading slash, just the endpoint name
     const response = await axios.get(`${API_BASE_URL}/csrf-token/`, {
       withCredentials: true,
     });
@@ -52,24 +52,8 @@ const fetchCsrfToken = async (): Promise<string | null> => {
     }
     return null;
   } catch (error: any) {
-    console.warn('CSRF token fetch from API endpoint failed, trying fallback:', error.message);
-    
-    // Fallback to root CSRF endpoint if API v1 endpoint fails
-    try {
-      const baseUrl = API_BASE_URL.replace(/\/api\/v1$/, '');
-      const fallbackResponse = await axios.get(`${baseUrl}/csrf-token/`, {
-        withCredentials: true,
-      });
-      
-      if (fallbackResponse.data && fallbackResponse.data.csrfToken) {
-        csrfToken = fallbackResponse.data.csrfToken;
-        return csrfToken;
-      }
-      return null;
-    } catch (fallbackError: any) {
-      console.error('Fallback CSRF token fetch failed:', fallbackError.message);
-      return null;
-    }
+    console.warn('CSRF token fetch failed:', error.message);
+    return null;
   }
 };
 
@@ -94,14 +78,8 @@ api.interceptors.request.use(
     // Skip CSRF for GET requests and CSRF token endpoint itself
     const isGetRequest = config.method?.toLowerCase() === 'get';
     const isCsrfEndpoint = config.url?.includes('csrf-token');
-    const isExemptEndpoint = [
-      'login',
-      'register',
-      'password-reset',
-      'api-token-auth'
-    ].some(endpoint => config.url?.includes(endpoint));
     
-    if (!isGetRequest && !isCsrfEndpoint && !isExemptEndpoint) {
+    if (!isGetRequest && !isCsrfEndpoint) {
       let token = getCsrfTokenFromCookies();
       
       // If no CSRF token in cookies, fetch one
@@ -184,7 +162,11 @@ api.interceptors.response.use(
  */
 export const loginUser = async (email: string, password: string) => {
   try {
-    const response = await api.post('/accounts/auth/login/', { email, password });
+    // FIXED: No leading slash
+    const response = await api.post('accounts/auth/login/', { 
+      email, 
+      password 
+    });
     
     if (response.data.token) {
       localStorage.setItem('auth_token', response.data.token);
@@ -206,7 +188,8 @@ export const loginUser = async (email: string, password: string) => {
  */
 export const registerUser = async (userData: any) => {
   try {
-    const response = await api.post('/accounts/auth/register/', userData);
+    // FIXED: No leading slash
+    const response = await api.post('accounts/auth/register/', userData);
     
     if (response.data.token) {
       localStorage.setItem('auth_token', response.data.token);
@@ -225,7 +208,8 @@ export const registerUser = async (userData: any) => {
  */
 export const logoutUser = async () => {
   try {
-    await api.post('/accounts/auth/logout/');
+    // FIXED: No leading slash
+    await api.post('accounts/auth/logout/');
   } catch (error: any) {
     console.warn('Logout error:', error.message);
   } finally {
@@ -244,9 +228,5 @@ export const apiPost = (url: string, data?: any, config?: any) => api.post(url, 
 export const apiPut = (url: string, data?: any, config?: any) => api.put(url, data, config);
 export const apiPatch = (url: string, data?: any, config?: any) => api.patch(url, data, config);
 export const apiDelete = (url: string, config?: any) => api.delete(url, config);
-
-// Export the raw instance and auth helpers
-// Note: Removed duplicate export statement that was causing build error
-// export { api, loginUser, registerUser, logoutUser }; // ← REMOVE THIS LINE
 
 export default api;
