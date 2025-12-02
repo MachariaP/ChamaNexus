@@ -136,7 +136,8 @@ api.interceptors.response.use(
       // Only redirect if not already on login page
       if (window.location.pathname !== '/login' && 
           window.location.pathname !== '/register') {
-        window.location.href = '/login';
+        // Redirect to landing page instead of login
+        window.location.href = '/';
       }
     }
     
@@ -209,13 +210,22 @@ export const registerUser = async (userData: any) => {
 export const logoutUser = async () => {
   try {
     // FIXED: No leading slash
-    await api.post('accounts/auth/logout/');
-  } catch (error: any) {
-    console.warn('Logout error:', error.message);
-  } finally {
+    const response = await api.post('accounts/auth/logout/');
+    // Get redirect URL from backend response if available
+    const redirectUrl = response.data.redirect_url || '/';
+    
+    // Clear local storage
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    
+    // Redirect to landing page (or URL from backend)
+    window.location.href = redirectUrl;
+  } catch (error: any) {
+    console.warn('Logout error:', error.message);
+    // Even on error, clear storage and redirect to landing page
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    window.location.href = '/';
   }
 };
 

@@ -56,12 +56,22 @@ export const authService = {
   // Logout user
   async logout(): Promise<void> {
     try {
-      await api.post('/accounts/auth/logout/');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
+      const response = await api.post('/accounts/auth/logout/');
+      // Get redirect URL from backend response if available
+      const redirectUrl = response.data.redirect_url || '/';
+      
+      // Clear local storage
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
+      
+      // Redirect to landing page (or URL from backend)
+      window.location.href = redirectUrl;
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even on error, clear storage and redirect to landing page
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      window.location.href = '/';
     }
   },
 
