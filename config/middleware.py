@@ -16,16 +16,23 @@ class CsrfExemptApiMiddleware(CsrfViewMiddleware):
     in MIDDLEWARE settings.
     """
     
+    def __init__(self, get_response):
+        """
+        Initialize middleware and compile CSRF exempt patterns for performance.
+        """
+        super().__init__(get_response)
+        # Compile patterns once during initialization for better performance
+        pattern_strings = getattr(settings, 'API_CSRF_EXEMPT_PATTERNS', [])
+        self.compiled_patterns = [re.compile(pattern) for pattern in pattern_strings]
+    
     def process_view(self, request, callback, callback_args, callback_kwargs):
         """
         Process view and check if it should be CSRF exempt based on URL patterns.
         """
-        # Get CSRF exempt patterns from settings, with safe fallback
-        exempt_patterns = getattr(settings, 'API_CSRF_EXEMPT_PATTERNS', [])
-        
         # Check if this path matches any of the CSRF exempt patterns
-        for pattern in exempt_patterns:
-            if re.match(pattern, request.path):
+        for pattern in self.compiled_patterns:
+            # Use fullmatch to ensure complete path matching and prevent bypass
+            if pattern.fullmatch(request.path):
                 # Skip CSRF validation for this request
                 return None
         
