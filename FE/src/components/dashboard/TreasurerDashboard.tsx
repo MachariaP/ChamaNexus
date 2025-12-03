@@ -54,7 +54,7 @@ const TreasurerDashboard: React.FC = () => {
   const fetchTreasurerData = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/v1/dashboard/treasurer/');
+      const response = await api.get('/accounts/dashboard/summary/');
       setDashboardData(response.data);
     } catch (error) {
       console.error('Failed to load treasurer data:', error);
