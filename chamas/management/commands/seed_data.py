@@ -146,25 +146,31 @@ class Command(BaseCommand):
             
             # Each member makes a contribution
             for member in members:
-                if Member.objects.filter(pk=member.pk).exists():  # Verify member still exists
-                    # Monthly contribution
-                    mpesa_code = f'ABC{transaction_counter:07d}'
-                    try:
-                        Transaction.objects.create(
-                            member=member,
-                            amount=Decimal('5000.00'),
-                            date=month_date - timedelta(days=random.randint(0, 5)),
-                            transaction_type='CONTRIBUTION',
-                            mpesa_code=mpesa_code,
-                            status='VERIFIED',
-                            description=f'Monthly contribution for {month_date.strftime("%B %Y")}',
-                            created_by=users['treasurer@chamanexus.com'],
-                            verified_by=users['treasurer@chamanexus.com'],
-                            verified_at=month_date
-                        )
-                        transaction_counter += 1
-                    except Exception as e:
+                # Monthly contribution
+                mpesa_code = f'ABC{transaction_counter:07d}'
+                try:
+                    Transaction.objects.create(
+                        member=member,
+                        amount=Decimal('5000.00'),
+                        date=month_date - timedelta(days=random.randint(0, 5)),
+                        transaction_type='CONTRIBUTION',
+                        mpesa_code=mpesa_code,
+                        status='VERIFIED',
+                        description=f'Monthly contribution for {month_date.strftime("%B %Y")}',
+                        created_by=users['treasurer@chamanexus.com'],
+                        verified_by=users['treasurer@chamanexus.com'],
+                        verified_at=month_date
+                    )
+                    transaction_counter += 1
+                except Transaction.DoesNotExist:
+                    # Member doesn't exist, skip
+                    pass
+                except Exception as e:
+                    # Handle duplicate mpesa_code or other database errors
+                    if 'UNIQUE constraint' in str(e) or 'duplicate' in str(e).lower():
                         self.stdout.write(self.style.WARNING(f'Skipping duplicate transaction: {mpesa_code}'))
+                    else:
+                        self.stdout.write(self.style.ERROR(f'Error creating transaction: {e}'))
 
         # Add some fines for specific members (defaulters)
         fine_members = members[1:4]  # John, Mary, Peter
@@ -184,7 +190,10 @@ class Command(BaseCommand):
                     verified_at=now - timedelta(days=random.randint(10, 60))
                 )
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f'Skipping duplicate fine: {mpesa_code}'))
+                if 'UNIQUE constraint' in str(e) or 'duplicate' in str(e).lower():
+                    self.stdout.write(self.style.WARNING(f'Skipping duplicate fine: {mpesa_code}'))
+                else:
+                    self.stdout.write(self.style.ERROR(f'Error creating fine: {e}'))
 
         # Add some recent transactions (last 7 days)
         recent_members = random.sample(members, 3)
@@ -204,7 +213,10 @@ class Command(BaseCommand):
                     verified_at=now - timedelta(days=random.randint(0, 7))
                 )
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f'Skipping duplicate recent transaction: {mpesa_code}'))
+                if 'UNIQUE constraint' in str(e) or 'duplicate' in str(e).lower():
+                    self.stdout.write(self.style.WARNING(f'Skipping duplicate recent transaction: {mpesa_code}'))
+                else:
+                    self.stdout.write(self.style.ERROR(f'Error creating recent transaction: {e}'))
 
         # Add some payouts for members with loans
         loan_members = members[1:3]  # John and Mary
@@ -225,7 +237,10 @@ class Command(BaseCommand):
                     verified_at=now - timedelta(days=60)
                 )
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f'Skipping duplicate loan: {mpesa_code}'))
+                if 'UNIQUE constraint' in str(e) or 'duplicate' in str(e).lower():
+                    self.stdout.write(self.style.WARNING(f'Skipping duplicate loan: {mpesa_code}'))
+                else:
+                    self.stdout.write(self.style.ERROR(f'Error creating loan: {e}'))
 
         # Add some pending transactions
         pending_member = members[-1]
@@ -242,7 +257,10 @@ class Command(BaseCommand):
                 created_by=users['treasurer@chamanexus.com']
             )
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f'Skipping duplicate pending transaction: {mpesa_code}'))
+            if 'UNIQUE constraint' in str(e) or 'duplicate' in str(e).lower():
+                self.stdout.write(self.style.WARNING(f'Skipping duplicate pending transaction: {mpesa_code}'))
+            else:
+                self.stdout.write(self.style.ERROR(f'Error creating pending transaction: {e}'))
 
         total_members = Member.objects.count()
         total_transactions = Transaction.objects.count()
