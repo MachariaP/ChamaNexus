@@ -11,6 +11,7 @@ from django.contrib.auth import login, logout
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Sum, Q, Count
 
 from .models import User
 from .serializers import (
@@ -268,134 +269,231 @@ class DashboardViewSet(GenericViewSet):
     @action(detail=False, methods=['get'], url_path='summary')
     def dashboard_summary(self, request):
         """Get dashboard summary for authenticated user"""
+        from chamas.models import Member, Transaction, ChamaGroup
+        from decimal import Decimal
+        
         user = request.user
         
-        # This is mock data - replace with actual database queries
+        # Get the Chama group
+        chama_group = ChamaGroup.objects.first()
+        
         # For members
         if not user.is_staff:
+            # Get member data
+            try:
+                member = Member.objects.get(user=user)
+            except Member.DoesNotExist:
+                return Response({
+                    'error': 'Member profile not found. Please contact the administrator.'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Calculate personal balance
+            personal_balance = float(member.calculate_net_balance())
+            
+            # Get group balance
+            group_balance = float(chama_group.calculate_total_balance()) if chama_group else 0
+            
+            # Get current month stats
+            now = timezone.now()
+            current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+            # Calculate contribution summary
+            contributions = Transaction.objects.filter(
+                member=member,
+                transaction_type='CONTRIBUTION',
+                status='VERIFIED'
+            )
+            
+            this_month_contributions = contributions.filter(
+                date__gte=current_month_start
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            
+            total_contributions = contributions.aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0.00')
+            
+            last_contribution = contributions.order_by('-date').first()
+            
+            # Get loan status (if member has any payouts)
+            payouts = Transaction.objects.filter(
+                member=member,
+                transaction_type='PAYOUT',
+                status='VERIFIED'
+            )
+            
+            loan_status = None
+            if payouts.exists():
+                total_borrowed = payouts.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+                # For simplicity, assume 50% has been paid (in real app, track repayments)
+                amount_paid = total_borrowed * Decimal('0.5')
+                remaining_balance = total_borrowed - amount_paid
+                
+                loan_status = {
+                    'active': True,
+                    'amount_borrowed': float(total_borrowed),
+                    'amount_paid': float(amount_paid),
+                    'remaining_balance': float(remaining_balance),
+                    'next_payment_date': (now + timedelta(days=30)).isoformat(),
+                    'next_payment_amount': 5000,
+                }
+            
+            # Get recent transactions
+            recent_txns = Transaction.objects.filter(
+                member=member,
+                status='VERIFIED'
+            ).order_by('-date')[:5]
+            
+            recent_transactions = []
+            for txn in recent_txns:
+                txn_type_map = {
+                    'CONTRIBUTION': 'contribution',
+                    'FINE': 'fine',
+                    'PAYOUT': 'loan_disbursement',
+                    'EXPENSE': 'expense',
+                }
+                recent_transactions.append({
+                    'id': str(txn.id),
+                    'date': txn.date.isoformat(),
+                    'type': txn_type_map.get(txn.transaction_type, 'contribution'),
+                    'amount': float(txn.amount),
+                    'description': txn.description or f'{txn.get_transaction_type_display()}',
+                    'status': 'completed',
+                })
+            
             data = {
-                'personal_balance': 125000,
-                'group_balance': 2450000,
+                'personal_balance': personal_balance,
+                'group_balance': group_balance,
                 'next_meeting': {
-                    'date': (timezone.now() + timedelta(days=7)).isoformat(),
+                    'date': (now + timedelta(days=7)).isoformat(),
                     'time': '14:00',
                     'location': 'Community Hall, Nairobi',
                     'agenda': 'Monthly contributions and loan approvals',
                     'my_position': 3,
-                    'total_positions': 15,
+                    'total_positions': Member.objects.filter(status='ACTIVE').count(),
                 },
-                'loan_status': {
-                    'active': True,
-                    'amount_borrowed': 50000,
-                    'amount_paid': 25000,
-                    'remaining_balance': 25000,
-                    'next_payment_date': (timezone.now() + timedelta(days=14)).isoformat(),
-                    'next_payment_amount': 5000,
-                } if user.id % 3 == 0 else None,  # Only some users have loans
-                'recent_transactions': [
-                    {
-                        'id': '1',
-                        'date': (timezone.now() - timedelta(days=2)).isoformat(),
-                        'type': 'contribution',
-                        'amount': 5000,
-                        'description': 'Monthly contribution',
-                        'status': 'completed',
-                    },
-                    {
-                        'id': '2',
-                        'date': (timezone.now() - timedelta(days=30)).isoformat(),
-                        'type': 'loan_payment',
-                        'amount': 5000,
-                        'description': 'Loan installment',
-                        'status': 'completed',
-                    },
-                    {
-                        'id': '3',
-                        'date': (timezone.now() - timedelta(days=60)).isoformat(),
-                        'type': 'loan_disbursement',
-                        'amount': 50000,
-                        'description': 'Business loan',
-                        'status': 'completed',
-                    },
-                ],
+                'loan_status': loan_status,
+                'recent_transactions': recent_transactions,
                 'contribution_summary': {
-                    'this_month': 5000,
-                    'total': 125000,
-                    'last_contribution_date': (timezone.now() - timedelta(days=2)).isoformat(),
+                    'this_month': float(this_month_contributions),
+                    'total': float(total_contributions),
+                    'last_contribution_date': last_contribution.date.isoformat() if last_contribution else None,
                 },
             }
         # For treasurers/staff
         else:
+            now = timezone.now()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+            # Get group balance
+            total_balance = float(chama_group.calculate_total_balance()) if chama_group else 0
+            
+            # Get today's collections
+            total_collected_today = Transaction.objects.filter(
+                transaction_type='CONTRIBUTION',
+                status='VERIFIED',
+                date__gte=today_start
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            
+            # Get outstanding loans (total payouts - we'd track repayments in real app)
+            outstanding_loans = Transaction.objects.filter(
+                transaction_type='PAYOUT',
+                status='VERIFIED'
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            
+            # Get total members
+            total_members = Member.objects.filter(status='ACTIVE').count()
+            
+            # Find defaulters (members with fines or who haven't contributed this month)
+            members_with_fines_ids = Member.objects.filter(
+                transactions__transaction_type='FINE',
+                transactions__status='VERIFIED'
+            ).values_list('id', flat=True).distinct()
+            
+            members_without_contribution_ids = Member.objects.filter(
+                status='ACTIVE'
+            ).exclude(
+                transactions__transaction_type='CONTRIBUTION',
+                transactions__status='VERIFIED',
+                transactions__date__gte=current_month_start
+            ).values_list('id', flat=True)
+            
+            # Combine member IDs
+            defaulter_ids = set(members_with_fines_ids) | set(members_without_contribution_ids)
+            defaulters_queryset = Member.objects.filter(id__in=list(defaulter_ids))[:5]
+            
+            defaulters_list = []
+            for member in defaulters_queryset:
+                fines = Transaction.objects.filter(
+                    member=member,
+                    transaction_type='FINE',
+                    status='VERIFIED'
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+                
+                last_contribution = Transaction.objects.filter(
+                    member=member,
+                    transaction_type='CONTRIBUTION',
+                    status='VERIFIED'
+                ).order_by('-date').first()
+                
+                days_overdue = 0
+                if last_contribution:
+                    days_overdue = (now - last_contribution.date).days
+                else:
+                    days_overdue = 90  # No contributions ever
+                
+                defaulters_list.append({
+                    'id': str(member.id),
+                    'name': member.name,
+                    'phone': member.phone_number,
+                    'amount': float(fines),
+                    'days_overdue': days_overdue,
+                    'last_contribution': last_contribution.date.isoformat() if last_contribution else None,
+                })
+            
+            # Get pending transactions count
+            pending_transactions = Transaction.objects.filter(status='PENDING').count()
+            
+            # Get recent group transactions
+            recent_group_txns = Transaction.objects.filter(
+                status='VERIFIED'
+            ).order_by('-date')[:10]
+            
+            recent_group_transactions = []
+            for txn in recent_group_txns:
+                txn_type_map = {
+                    'CONTRIBUTION': 'contribution',
+                    'FINE': 'fine',
+                    'PAYOUT': 'loan_payment',
+                    'EXPENSE': 'expense',
+                }
+                recent_group_transactions.append({
+                    'id': str(txn.id),
+                    'date': txn.date.isoformat(),
+                    'type': txn_type_map.get(txn.transaction_type, 'contribution'),
+                    'member_name': txn.member.name if txn.member else 'Group',
+                    'amount': float(txn.amount),
+                    'description': txn.description or f'{txn.get_transaction_type_display()}',
+                    'status': 'completed',
+                })
+            
             data = {
                 'group_summary': {
-                    'total_balance': 2450000,
-                    'total_collected_today': 75000,
-                    'outstanding_loans': 450000,
-                    'defaulters_count': 3,
-                    'total_members': 25,
-                    'attendance_rate': 88,
+                    'total_balance': total_balance,
+                    'total_collected_today': float(total_collected_today),
+                    'outstanding_loans': float(outstanding_loans),
+                    'defaulters_count': len(defaulters_list),
+                    'total_members': total_members,
+                    'attendance_rate': 85,  # Would be calculated from meeting attendance in real app
                 },
-                'defaulters': [
-                    {
-                        'id': '1',
-                        'name': 'John Kamau',
-                        'phone': '0712345678',
-                        'amount': 10000,
-                        'days_overdue': 45,
-                        'last_contribution': (timezone.now() - timedelta(days=60)).isoformat(),
-                    },
-                    {
-                        'id': '2',
-                        'name': 'Mary Wanjiku',
-                        'phone': '0723456789',
-                        'amount': 5000,
-                        'days_overdue': 30,
-                        'last_contribution': (timezone.now() - timedelta(days=45)).isoformat(),
-                    },
-                    {
-                        'id': '3',
-                        'name': 'Peter Otieno',
-                        'phone': '0734567890',
-                        'amount': 15000,
-                        'days_overdue': 15,
-                        'last_contribution': (timezone.now() - timedelta(days=30)).isoformat(),
-                    },
-                ],
+                'defaulters': defaulters_list,
                 'pending_actions': {
-                    'pending_loans': 5,
-                    'pending_approvals': 3,
+                    'pending_loans': 0,  # Would track loan applications
+                    'pending_approvals': pending_transactions,
                     'upcoming_meetings': 1,
-                    'overdue_fines': 2,
+                    'overdue_fines': len(defaulters_list),
                 },
-                'recent_group_transactions': [
-                    {
-                        'id': '1',
-                        'date': (timezone.now() - timedelta(hours=2)).isoformat(),
-                        'type': 'contribution',
-                        'member_name': 'Jane Muthoni',
-                        'amount': 5000,
-                        'description': 'Monthly contribution',
-                        'status': 'completed',
-                    },
-                    {
-                        'id': '2',
-                        'date': (timezone.now() - timedelta(days=1)).isoformat(),
-                        'type': 'loan_payment',
-                        'member_name': 'David Kiprop',
-                        'amount': 10000,
-                        'description': 'Loan repayment',
-                        'status': 'completed',
-                    },
-                    {
-                        'id': '3',
-                        'date': (timezone.now() - timedelta(days=2)).isoformat(),
-                        'type': 'contribution',
-                        'member_name': 'Grace Akinyi',
-                        'amount': 5000,
-                        'description': 'Monthly contribution',
-                        'status': 'completed',
-                    },
-                ],
+                'recent_group_transactions': recent_group_transactions,
             }
         
         return Response(data, status=status.HTTP_200_OK)
