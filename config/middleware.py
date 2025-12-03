@@ -7,34 +7,24 @@ from django.conf import settings
 import re
 
 
-class CsrfExemptApiMiddleware:
+class CsrfExemptApiMiddleware(CsrfViewMiddleware):
     """
-    Middleware to exempt certain API endpoints from CSRF protection.
+    Custom CSRF middleware that exempts certain API endpoints from CSRF protection.
     
-    Add this to your MIDDLEWARE setting after CsrfViewMiddleware.
+    This middleware extends Django's CsrfViewMiddleware and checks configured patterns
+    before applying CSRF validation. It should REPLACE django.middleware.csrf.CsrfViewMiddleware
+    in MIDDLEWARE settings.
     """
     
-    def __init__(self, get_response):
-        self.get_response = get_response
-    
-    def __call__(self, request):
-        # Check if this path should be CSRF exempt
+    def process_view(self, request, callback, callback_args, callback_kwargs):
+        """
+        Process view and check if it should be CSRF exempt based on URL patterns.
+        """
+        # Check if this path matches any of the CSRF exempt patterns
         for pattern in settings.API_CSRF_EXEMPT_PATTERNS:
             if re.match(pattern, request.path):
-                # Mark request as CSRF exempt
-                request.csrf_exempt = True
-                break
+                # Skip CSRF validation for this request
+                return None
         
-        return self.get_response(request)
-    
-    def process_view(self, request, view_func, view_args, view_kwargs):
-        """
-        Process view before it's called.
-        """
-        # Apply CSRF exemption based on patterns
-        for pattern in settings.API_CSRF_EXEMPT_PATTERNS:
-            if re.match(pattern, request.path):
-                # Exempt from CSRF protection
-                request.csrf_exempt = True
-                break
-        return None
+        # Otherwise, use the default CSRF protection
+        return super().process_view(request, callback, callback_args, callback_kwargs)

@@ -90,9 +90,8 @@ MIDDLEWARE = [
     # Session and authentication middleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',  # Keep this
     
-    # Custom CSRF exempt middleware
+    # Custom CSRF middleware (replaces django.middleware.csrf.CsrfViewMiddleware)
     'config.middleware.CsrfExemptApiMiddleware',
     
     'django.contrib.auth.middleware.AuthenticationMiddleware',
