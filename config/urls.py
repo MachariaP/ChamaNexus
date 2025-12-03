@@ -70,11 +70,13 @@ api_v1_patterns = [
     # Accounts app
     path('accounts/', include('accounts.urls')),
     
+    # Chamas app
+    path('chamas/', include('chamas.urls')),
+    
     # Dashboard app
     #path('dashboard/', include('dashboard.urls')),
     
     # Add other apps here when created
-    # path('chamas/', include('chamas.urls')),
     # path('members/', include('members.urls')),
 ]
 
