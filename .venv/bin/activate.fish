@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/phines-macharia/ALX_2025-2026/Copilot/ChamaNexus/.venv
+set -gx VIRTUAL_ENV /home/runner/work/ChamaNexus/ChamaNexus/.venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH
