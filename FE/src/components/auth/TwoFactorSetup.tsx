@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import QRCode from 'qrcode.react';
+import api from '../../services/api';
 
 interface TwoFactorSetupProps {
   onSetupComplete: () => void;
@@ -19,24 +20,15 @@ const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({ onSetupComplete, onCanc
     setError('');
     
     try {
-      const response = await fetch('/api/v1/accounts/2fa/setup/', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Token ${localStorage.getItem('auth_token')}`,
-        },
-      });
+      const response = await api.get('/accounts/2fa/setup/');
       
-      const data = await response.json();
-      
-      if (response.ok) {
-        setQrCodeData(data.qr_code);
-        setSecret(data.secret);
+      if (response.data) {
+        setQrCodeData(response.data.qr_code);
+        setSecret(response.data.secret);
         setStep('verify');
-      } else {
-        setError(data.error || 'Failed to setup 2FA');
       }
-    } catch (err) {
-      setError('Network error occurred');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to setup 2FA');
     } finally {
       setIsLoading(false);
     }
@@ -47,24 +39,13 @@ const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({ onSetupComplete, onCanc
     setError('');
     
     try {
-      const response = await fetch('/api/v1/accounts/2fa/verify/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({ token }),
-      });
+      const response = await api.post('/accounts/2fa/verify/', { token });
       
-      const data = await response.json();
-      
-      if (response.ok) {
+      if (response.data) {
         onSetupComplete();
-      } else {
-        setError(data.error || 'Invalid token');
       }
-    } catch (err) {
-      setError('Network error occurred');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Invalid token');
     } finally {
       setIsLoading(false);
     }

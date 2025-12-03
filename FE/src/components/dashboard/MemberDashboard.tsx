@@ -55,7 +55,7 @@ const MemberDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/v1/dashboard/summary/');
+      const response = await api.get('/accounts/dashboard/summary/');
       setDashboardData(response.data);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load dashboard data');
