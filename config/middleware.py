@@ -20,8 +20,11 @@ class CsrfExemptApiMiddleware(CsrfViewMiddleware):
         """
         Process view and check if it should be CSRF exempt based on URL patterns.
         """
+        # Get CSRF exempt patterns from settings, with safe fallback
+        exempt_patterns = getattr(settings, 'API_CSRF_EXEMPT_PATTERNS', [])
+        
         # Check if this path matches any of the CSRF exempt patterns
-        for pattern in settings.API_CSRF_EXEMPT_PATTERNS:
+        for pattern in exempt_patterns:
             if re.match(pattern, request.path):
                 # Skip CSRF validation for this request
                 return None
