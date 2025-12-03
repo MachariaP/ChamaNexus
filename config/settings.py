@@ -70,8 +70,8 @@ INSTALLED_APPS = [
     
     # Local apps
     'accounts',
+    'chamas',
     #'dashboard',
-    # 'chamas',    # Uncomment when created
     # 'members',   # Uncomment when created
 ]
 
