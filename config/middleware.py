@@ -5,6 +5,9 @@ Custom middleware for handling CSRF in API requests.
 from django.middleware.csrf import CsrfViewMiddleware
 from django.conf import settings
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CsrfExemptApiMiddleware(CsrfViewMiddleware):
@@ -21,9 +24,27 @@ class CsrfExemptApiMiddleware(CsrfViewMiddleware):
         Initialize middleware and compile CSRF exempt patterns for performance.
         """
         super().__init__(get_response)
-        # Compile patterns once during initialization for better performance
-        pattern_strings = getattr(settings, 'API_CSRF_EXEMPT_PATTERNS', [])
-        self.compiled_patterns = [re.compile(pattern) for pattern in pattern_strings]
+        # Get patterns from settings
+        pattern_strings = getattr(settings, 'API_CSRF_EXEMPT_PATTERNS', None)
+        
+        # Warn if patterns are not configured
+        if pattern_strings is None:
+            logger.warning(
+                'API_CSRF_EXEMPT_PATTERNS is not configured in settings. '
+                'CSRF protection will be applied to all endpoints.'
+            )
+            self.compiled_patterns = []
+        else:
+            # Compile patterns once during initialization for better performance
+            self.compiled_patterns = []
+            for pattern in pattern_strings:
+                try:
+                    self.compiled_patterns.append(re.compile(pattern))
+                except re.error as e:
+                    logger.error(
+                        f'Invalid regex pattern in API_CSRF_EXEMPT_PATTERNS: "{pattern}". '
+                        f'Error: {e}. This pattern will be skipped.'
+                    )
     
     def process_view(self, request, callback, callback_args, callback_kwargs):
         """
