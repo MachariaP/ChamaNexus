@@ -23,12 +23,12 @@ class MemberSerializer(serializers.ModelSerializer):
     
     def get_payment_status(self, obj):
         """Get payment status for current cycle"""
-        # Get expected amount from context if available
-        request = self.context.get('request')
-        expected_amount = None
-        
-        if request and hasattr(request, 'chama_group'):
-            expected_amount = request.chama_group.monthly_contribution_amount
+        # Get expected amount from ChamaGroup in database
+        try:
+            chama_group = ChamaGroup.objects.first()
+            expected_amount = chama_group.monthly_contribution_amount if chama_group else None
+        except Exception:
+            expected_amount = None
         
         return obj.get_payment_status(expected_amount)
     

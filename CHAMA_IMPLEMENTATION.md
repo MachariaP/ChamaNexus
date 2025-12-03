@@ -176,10 +176,10 @@ def calculate_net_balance(self):
 
 **Formula:**
 ```
-Group Balance = Total Contributions - (Total Payouts + Total Expenses)
+Group Balance = Total Contributions + Total Fines - (Total Payouts + Total Expenses)
 ```
 
-**Note:** Fines add to the group balance (they are not deducted).
+**Note:** Fines add to the group balance as they represent additional income to the group.
 
 **Implementation:**
 - Only counts **VERIFIED** transactions

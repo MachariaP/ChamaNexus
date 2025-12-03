@@ -17,7 +17,7 @@ A simple, non-complex Django-based mobile application to help Kenyan Chamas mana
 
 1. **Data Integrity** - M-Pesa transaction codes are unique identifiers
 2. **Member Statement** - Net Balance = Contributions - (Fines + Payouts)
-3. **Group Balance** - Total Assets = Contributions - (Payouts + Expenses)
+3. **Group Balance** - Total Assets = Contributions + Fines - (Payouts + Expenses)
 4. **Admin Access** - Only Treasurer/Admin can log and verify transactions
 5. **Payment Status** - Automatic determination of PAID/SHORT/OVERDUE status
 

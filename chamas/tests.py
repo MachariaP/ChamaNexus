@@ -279,6 +279,39 @@ class ChamaGroupModelTest(TestCase):
         # 1000 + 1000 - 500 - 300 = 1200
         self.assertEqual(balance, Decimal('1200.00'))
     
+    def test_calculate_total_balance_with_fines(self):
+        """Test Business Logic Rule 3: Group Balance - fines add to balance"""
+        # Member 1 contribution
+        Transaction.objects.create(
+            member=self.member1,
+            amount=Decimal('1000.00'),
+            transaction_type='CONTRIBUTION',
+            mpesa_code='ABC1234567',
+            status='VERIFIED'
+        )
+        
+        # Fine from member 2
+        Transaction.objects.create(
+            member=self.member2,
+            amount=Decimal('100.00'),
+            transaction_type='FINE',
+            mpesa_code='FIN1234567',
+            status='VERIFIED'
+        )
+        
+        # Payout to member 1
+        Transaction.objects.create(
+            member=self.member1,
+            amount=Decimal('200.00'),
+            transaction_type='PAYOUT',
+            mpesa_code='PAY1234567',
+            status='VERIFIED'
+        )
+        
+        balance = self.group.calculate_total_balance()
+        # 1000 (contribution) + 100 (fine) - 200 (payout) = 900
+        self.assertEqual(balance, Decimal('900.00'))
+    
     def test_get_total_fines(self):
         """Test getting total fines collected"""
         # Add fines

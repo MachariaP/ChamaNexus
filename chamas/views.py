@@ -54,11 +54,8 @@ class MemberViewSet(viewsets.ModelViewSet):
         member = self.get_object()
         
         # Get expected contribution amount
-        try:
-            chama_group = ChamaGroup.objects.first()
-            expected_amount = chama_group.monthly_contribution_amount if chama_group else None
-        except ChamaGroup.DoesNotExist:
-            expected_amount = None
+        chama_group = ChamaGroup.objects.first()
+        expected_amount = chama_group.monthly_contribution_amount if chama_group else None
         
         status_value = member.get_payment_status(expected_amount)
         

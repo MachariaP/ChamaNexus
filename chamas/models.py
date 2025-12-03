@@ -373,7 +373,8 @@ class ChamaGroup(models.Model):
     def calculate_total_balance(self):
         """
         Business Logic Rule 3: Calculate Chama's total cash assets.
-        Formula: Sum of all verified contributions - (Sum of all fines + Sum of all payouts + Sum of all expenses)
+        Formula: Sum of all verified contributions + fines - (Sum of all payouts + Sum of all expenses)
+        Note: Fines add to the group balance as they represent additional income
         """
         contributions = Transaction.objects.filter(
             transaction_type='CONTRIBUTION',
@@ -395,7 +396,7 @@ class ChamaGroup(models.Model):
             status='VERIFIED'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         
-        return contributions - (payouts + expenses)
+        return contributions + fines - (payouts + expenses)
     
     def get_total_fines(self):
         """Get total fines collected (these stay in the group)"""
